@@ -1,79 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 160"
      shape-rendering="crispEdges">
-  <!-- Classic Win 3.1 teal desktop -->
-  <rect width="480" height="200" fill="#008080"/>
+  <!-- Dark background, CRT-ish -->
+  <rect width="480" height="160" fill="#141414"/>
 
-  <!-- Outer 3D bevel: white top/left, dark grey bottom/right -->
-  <rect x="0" y="0" width="480" height="4" fill="#FFFFFF"/>
-  <rect x="0" y="0" width="4" height="200" fill="#FFFFFF"/>
-  <rect x="0" y="196" width="480" height="4" fill="#404040"/>
-  <rect x="476" y="0" width="4" height="200" fill="#404040"/>
+  <!-- Thin top and bottom rules -->
+  <rect x="0" y="0" width="480" height="2" fill="#C8870A"/>
+  <rect x="0" y="158" width="480" height="2" fill="#C8870A"/>
 
-  <!-- Inner 3D bevel -->
-  <rect x="4" y="4" width="472" height="2" fill="#C0C0C0"/>
-  <rect x="4" y="4" width="2" height="192" fill="#C0C0C0"/>
-  <rect x="4" y="194" width="472" height="2" fill="#000000"/>
-  <rect x="474" y="4" width="2" height="192" fill="#000000"/>
+  <!-- PIGWIZ wordmark, amber phosphor -->
+  <text x="240" y="92" text-anchor="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="62" font-weight="700"
+        fill="#FFB000" letter-spacing="8">PIGWIZ</text>
 
-  <!-- Pig wizard, hand-pixeled, left side of the logo -->
-  <g transform="translate(40 50)">
-    <!-- Wizard hat: navy with yellow stars -->
-    <polygon points="0,40 80,40 40,0" fill="#1E40AF" stroke="#000" stroke-width="2"/>
-    <polygon points="-4,38 84,38 -4,46 84,46" fill="#1E40AF"/>
-    <!-- Hat brim shadow -->
-    <rect x="-4" y="40" width="88" height="6" fill="#0F2E7A" stroke="#000" stroke-width="2"/>
-    <!-- Stars on the hat -->
-    <rect x="32" y="14" width="4" height="4" fill="#FFFF00"/>
-    <rect x="34" y="12" width="2" height="2" fill="#FFFF00"/>
-    <rect x="34" y="18" width="2" height="2" fill="#FFFF00"/>
-    <rect x="30" y="16" width="2" height="2" fill="#FFFF00"/>
-    <rect x="36" y="16" width="2" height="2" fill="#FFFF00"/>
-    <rect x="50" y="26" width="3" height="3" fill="#FFFFFF"/>
-    <rect x="20" y="24" width="3" height="3" fill="#FFFFFF"/>
-
-    <!-- Pig head: pink, blocky -->
-    <rect x="10" y="50" width="60" height="50" fill="#FFC0CB" stroke="#000" stroke-width="2"/>
-    <!-- Ear flaps -->
-    <rect x="6" y="48" width="10" height="14" fill="#FFC0CB" stroke="#000" stroke-width="2"/>
-    <rect x="64" y="48" width="10" height="14" fill="#FFC0CB" stroke="#000" stroke-width="2"/>
-    <!-- Ear inner -->
-    <rect x="9" y="52" width="4" height="6" fill="#FF69B4"/>
-    <rect x="67" y="52" width="4" height="6" fill="#FF69B4"/>
-
-    <!-- Eyes: black pixel squares -->
-    <rect x="22" y="68" width="6" height="6" fill="#000000"/>
-    <rect x="52" y="68" width="6" height="6" fill="#000000"/>
-    <!-- Eye shine -->
-    <rect x="24" y="68" width="2" height="2" fill="#FFFFFF"/>
-    <rect x="54" y="68" width="2" height="2" fill="#FFFFFF"/>
-
-    <!-- Snout -->
-    <rect x="28" y="80" width="24" height="14" fill="#FF69B4" stroke="#000" stroke-width="2"/>
-    <rect x="33" y="84" width="4" height="6" fill="#000000"/>
-    <rect x="43" y="84" width="4" height="6" fill="#000000"/>
-
-    <!-- Smug little smile -->
-    <rect x="22" y="92" width="36" height="2" fill="#000000"/>
-    <rect x="22" y="88" width="2" height="4" fill="#000000"/>
-    <rect x="56" y="88" width="2" height="4" fill="#000000"/>
-  </g>
-
-  <!-- PIGWIZ title in chunky Courier - yellow with thick black stroke -->
-  <text x="150" y="120" font-family="'Courier New', Courier, monospace"
-        font-size="72" font-weight="900" fill="#FFFF00"
-        stroke="#000000" stroke-width="6" paint-order="stroke">PIGWIZ</text>
-
-  <!-- Subtitle banner -->
-  <rect x="150" y="140" width="280" height="20" fill="#000080" stroke="#000" stroke-width="2"/>
-  <text x="290" y="155" text-anchor="middle" font-family="'Courier New', Courier, monospace"
-        font-size="13" font-weight="700" fill="#FFFFFF">PicoGUS DOS setup tools</text>
-
-  <!-- 8-bit decorative pixels -->
-  <rect x="438" y="170" width="6" height="6" fill="#FF0000"/>
-  <rect x="448" y="170" width="6" height="6" fill="#FFFF00"/>
-  <rect x="458" y="170" width="6" height="6" fill="#00FF00"/>
-  <rect x="430" y="180" width="6" height="6" fill="#0000FF"/>
-  <rect x="440" y="180" width="6" height="6" fill="#FF00FF"/>
-  <rect x="450" y="180" width="6" height="6" fill="#00FFFF"/>
+  <!-- Subtitle in dimmer amber -->
+  <text x="240" y="124" text-anchor="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="11" font-weight="400"
+        fill="#9A6F00" letter-spacing="3">PICOGUS  DOS  SETUP  TOOLS</text>
 </svg>
