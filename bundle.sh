@@ -465,16 +465,42 @@ else
     ( cd "${STAGE}/PICOGUS" && zip -qj9 "${FLOPPY_STAGE}/PGFIRM.ZIP" \
         PICOGUS.UF2 PG-NE2K.UF2 CTMOUSE.EXE SHSUCDX.COM UIDE.SYS UDVD2.SYS )
 
+    # If we have the GUS patches source available, pull just ULTRASND.PPL
+    # and ULTRASND.INI (the small driver config files - the 11 MB of .PAT
+    # audio samples don't fit on a floppy). LZMA on 16-bit DOS isn't a
+    # practical option here: minimum dict is 256 KB, conventional memory
+    # is 640 KB, and the 32-bit DJGPP lzma binaries silently misbehave in
+    # DOSBox-staging. DEFLATE was designed for exactly this constraint
+    # (32 KB lookback window).
+    FLOPPY_HAS_GUS=0
+    if [[ "${HAVE_GUS_PATCHES}" -eq 1 ]]; then
+        GUS_CFG_TMP="${STAGE}/extract/gus-cfg"
+        mkdir -p "${GUS_CFG_TMP}"
+        # GUS_ZIP_SRC at this point is the flat-normalised zip - both
+        # files live at root.
+        if unzip -qoj "${GUS_ZIP_SRC}" "ULTRASND.PPL" "ULTRASND.INI" \
+                -d "${GUS_CFG_TMP}" 2>/dev/null \
+           && [[ -f "${GUS_CFG_TMP}/ULTRASND.PPL" \
+              && -f "${GUS_CFG_TMP}/ULTRASND.INI" ]]; then
+            ( cd "${GUS_CFG_TMP}" && zip -qj9 "${FLOPPY_STAGE}/PGGUS.ZIP" \
+                ULTRASND.PPL ULTRASND.INI )
+            FLOPPY_HAS_GUS=1
+            echo ">> Bundling GUS driver config (PPL + INI, $(stat -f%z "${FLOPPY_STAGE}/PGGUS.ZIP" 2>/dev/null || stat -c%s "${FLOPPY_STAGE}/PGGUS.ZIP") bytes)"
+        fi
+    fi
+
     # INSTALL.BAT - one-shot deploy + launch.
     cat > "${FLOPPY_STAGE}/INSTALL.BAT" <<'BAT'
 @echo off
 echo.
-echo PIGWIZ floppy edition - deploying to C:\PICOGUS\...
+echo PIGWIZ floppy edition - deploying...
 echo.
 A:
 SET PATH=A:\;%PATH%
 if not exist C:\PICOGUS\NUL md C:\PICOGUS
 UNZIP.EXE -o PGFIRM.ZIP -d C:\PICOGUS\
+if exist PGGUS.ZIP md C:\ULTRASND
+if exist PGGUS.ZIP UNZIP.EXE -o PGGUS.ZIP -d C:\ULTRASND\
 copy PGSETUP.EXE C:\PICOGUS\
 copy PGUSINIT.EXE C:\PICOGUS\
 copy PGINST.EXE C:\PICOGUS\
@@ -494,9 +520,13 @@ Insert disk, then at the A> prompt run:
     INSTALL
 
 That copies the firmware and helper EXEs to C:\\PICOGUS\\ and starts
-the setup wizard. The Gravis UltraSound v4.11 patches are NOT on this
-disk (they need ~9 MB even at max compression). For GUS mode, grab
-the full bundle from the release page:
+the setup wizard. The 11 MB of Gravis UltraSound v4.11 .PAT audio
+samples are NOT on this disk - they cannot lossless-compress below
+~9 MB and LZMA on 16-bit DOS hits a wall (256 KB minimum dictionary,
+640 KB conventional memory).
+
+If you want full GUS-mode audio, grab the patches from the full
+release bundle and drop them in C:\\ULTRASND\\MIDI\\:
 
     https://github.com/pacnpal/PIGWIZ/releases
 
@@ -507,6 +537,7 @@ Files on this disk:
   UNZIP.EXE      Info-ZIP UnZip for DOS (FreeDOS package)
   CWSDPMI.EXE    DPMI host required by UNZIP (DJ Delorie, free)
   PGFIRM.ZIP     firmware + helper drivers, DEFLATE-compressed
+  PGGUS.ZIP      GUS driver config (PPL + INI), if available
   INSTALL.BAT    one-shot deploy + launch
 EOF
 
@@ -520,16 +551,20 @@ EOF
     # Make a 1.44MB zero-filled image (2880 * 512 = 1474560 bytes).
     dd if=/dev/zero of="${FLOPPY_IMG}" bs=512 count=2880 2>/dev/null
     mformat -i "${FLOPPY_IMG}" -f 1440 -v PIGWIZ ::
-    mcopy -i "${FLOPPY_IMG}" \
-        "${STAGE}/PICOGUS/PGINST.EXE" \
-        "${STAGE}/PICOGUS/PGSETUP.EXE" \
-        "${STAGE}/PICOGUS/PGUSINIT.EXE" \
-        "${STAGE}/PICOGUS/UNZIP.EXE" \
-        "${CWSDPMI_BIN}" \
-        "${FLOPPY_STAGE}/PGFIRM.ZIP" \
-        "${FLOPPY_STAGE}/INSTALL.BAT" \
-        "${FLOPPY_STAGE}/FLOPPY.TXT" \
-        ::
+    FLOPPY_FILES=(
+        "${STAGE}/PICOGUS/PGINST.EXE"
+        "${STAGE}/PICOGUS/PGSETUP.EXE"
+        "${STAGE}/PICOGUS/PGUSINIT.EXE"
+        "${STAGE}/PICOGUS/UNZIP.EXE"
+        "${CWSDPMI_BIN}"
+        "${FLOPPY_STAGE}/PGFIRM.ZIP"
+        "${FLOPPY_STAGE}/INSTALL.BAT"
+        "${FLOPPY_STAGE}/FLOPPY.TXT"
+    )
+    if [[ "${FLOPPY_HAS_GUS}" -eq 1 ]]; then
+        FLOPPY_FILES+=("${FLOPPY_STAGE}/PGGUS.ZIP")
+    fi
+    mcopy -i "${FLOPPY_IMG}" "${FLOPPY_FILES[@]}" ::
 
     cp "${FLOPPY_IMG}" "${OUT_DIR}/PIGWIZ-floppy-latest.IMG"
 
