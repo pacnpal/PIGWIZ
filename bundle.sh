@@ -50,12 +50,13 @@ UDVD2_URL="https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/cdrom/ui
 # If both fail, bundle.sh still succeeds - the installer just keeps its
 # "Download the GUS v4.11 package..." prompt at runtime.
 #
-# UNZIP_URL points at Info-ZIP's DOS self-extractor; we unwrap it on the
-# host to pull a bare UNZIP.EXE that ships alongside the patches.
+# UNZIP_URL points at the FreeDOS 1.1 repository package for Info-ZIP
+# UnZip; we unwrap it on the host to pull BIN/UNZIP.EXE out and ship
+# it alongside the patches.
 # ---------------------------------------------------------------------
 GUS_PATCHES_URL="${GUS_PATCHES_URL:-https://archive.org/download/GravisUltrasoundDOSDriverPackage/ultrasound.zip/ULTRASNDPPL161FIX.zip}"
 GUS_PATCHES_LOCAL="${GUS_PATCHES_LOCAL:-${REPO}/assets/ULTRASNDPPL161FIX.zip}"
-UNZIP_URL="${UNZIP_URL:-https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/util/file/unzip/unz552xn.exe}"
+UNZIP_URL="${UNZIP_URL:-https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.1/archivers/unzip.zip}"
 
 require() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -197,14 +198,14 @@ if [[ -n "${GUS_ZIP_SRC}" ]]; then
         ( cd "${gus_pack_dir}" && zip -qr "${STAGE}/dl/ULTRASND-flat.zip" . )
         GUS_ZIP_SRC="${STAGE}/dl/ULTRASND-flat.zip"
 
-        # Fetch and unwrap Info-ZIP UNZIP.EXE. The vendor distributes it
-        # as a DOS self-extracting EXE, but those are just zip files with
-        # a stub prepended - `unzip` on the host will happily skip the
-        # stub and pull UNZIP.EXE out.
+        # Fetch the FreeDOS Info-ZIP package and pull BIN/UNZIP.EXE out
+        # of it. The package is a plain zip; `unzip` extracts the whole
+        # tree, then we hunt for UNZIP.EXE inside (tolerates layout
+        # changes between FreeDOS repository versions).
         echo ">> Fetching Info-ZIP UNZIP.EXE: ${UNZIP_URL}"
-        if curl -fsSL -o "${STAGE}/dl/unzip-sfx.exe" "${UNZIP_URL}"; then
+        if curl -fsSL -o "${STAGE}/dl/freedos-unzip.zip" "${UNZIP_URL}"; then
             mkdir -p "${STAGE}/extract/unzip"
-            if unzip -qo "${STAGE}/dl/unzip-sfx.exe" \
+            if unzip -qo "${STAGE}/dl/freedos-unzip.zip" \
                     -d "${STAGE}/extract/unzip" 2>/dev/null; then
                 UNZIP_BIN=$(find "${STAGE}/extract/unzip" -iname "UNZIP.EXE" -type f -print -quit)
                 if [[ -n "${UNZIP_BIN}" ]]; then
