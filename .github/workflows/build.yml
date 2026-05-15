@@ -105,7 +105,7 @@ jobs:
       - name: Install bundling tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -qq -y zip unzip curl wget python3
+          sudo apt-get install -qq -y zip unzip curl wget python3 mtools
 
       - name: Pull built EXEs from the build job
         uses: actions/download-artifact@v4
@@ -136,6 +136,7 @@ jobs:
           # (which is only useful inside the build).
           path: |
             outputs/PIGWIZ-*.zip
+            outputs/PIGWIZ-floppy-*.IMG
             outputs/PGBUNDLE-*.EXE
             outputs/PGINST.EXE
             outputs/PGSETUP.EXE
@@ -159,6 +160,7 @@ jobs:
           # land on the release page.
           files: |
             outputs/PIGWIZ-*-pg-*.zip
+            outputs/PIGWIZ-floppy-*-pg-*.IMG
             outputs/PGBUNDLE-*-pg-*.EXE
             outputs/PGINST.EXE
             outputs/PGSETUP.EXE

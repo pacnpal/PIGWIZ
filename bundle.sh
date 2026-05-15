@@ -58,6 +58,12 @@ GUS_PATCHES_URL="${GUS_PATCHES_URL:-https://archive.org/download/GravisUltrasoun
 GUS_PATCHES_LOCAL="${GUS_PATCHES_LOCAL:-${REPO}/assets/ULTRASNDPPL161FIX.zip}"
 UNZIP_URL="${UNZIP_URL:-https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.1/archivers/unzip.zip}"
 
+# DJ Delorie's CWSDPMI for the floppy edition - UNZIP.EXE on DOS uses
+# the DJGPP go32 stub which needs a DPMI host present. CWSDPMI is the
+# canonical free one (~21KB), redistributable under its own permissive
+# licence (see csdpmi.doc).
+CWSDPMI_URL="${CWSDPMI_URL:-https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7b.zip}"
+
 require() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "!! Missing required tool: $1" >&2
@@ -407,3 +413,129 @@ cp "${OUT_DIR}/${SFX_NAME}" "${OUT_DIR}/PGBUNDLE-latest.EXE"
 echo
 echo ">> SFX bundle written:"
 ls -lh "${OUT_DIR}/${SFX_NAME}" "${OUT_DIR}/PGBUNDLE-latest.EXE"
+
+# ---------------------------------------------------------------------
+# Floppy edition: 1.44MB FAT12 disk image (PIGWIZ-floppy-*.IMG).
+#
+# Drops the 11MB of GUS .PAT audio samples - they can't compress lossless
+# below ~9MB so a floppy with them is mathematically impossible. Keeps
+# everything else: setup wizard, settings manager, PGUSINIT, both
+# firmware UF2s, the four FreeDOS helper drivers, plus Info-ZIP UnZip
+# and CWSDPMI on the DOS side. Firmware + drivers go into PGFIRM.ZIP
+# (DEFLATE -9, ~786 KB) and an A:\INSTALL.BAT extracts them to
+# C:\PICOGUS\ then launches PGINST.EXE.
+#
+# Requires mtools (mformat + mcopy) on the host. Skipped non-fatally
+# if mtools is absent.
+# ---------------------------------------------------------------------
+if ! command -v mformat >/dev/null 2>&1 || ! command -v mcopy >/dev/null 2>&1; then
+    echo
+    echo ">> Skipping floppy edition (mtools not installed)."
+else
+    echo
+    echo ">> Building floppy edition..."
+
+    # Make sure UNZIP.EXE is staged - the GUS-patches path may have
+    # already done it, but a fork build without patches still needs it
+    # on the floppy.
+    if [[ ! -f "${STAGE}/PICOGUS/UNZIP.EXE" ]]; then
+        if [[ ! -d "${STAGE}/extract/unzip" ]]; then
+            echo ">> Fetching Info-ZIP UNZIP.EXE for floppy: ${UNZIP_URL}"
+            curl -fsSL -o "${STAGE}/dl/freedos-unzip.zip" "${UNZIP_URL}"
+            mkdir -p "${STAGE}/extract/unzip"
+            unzip -qo "${STAGE}/dl/freedos-unzip.zip" -d "${STAGE}/extract/unzip"
+        fi
+        UNZIP_BIN=$(find_in "${STAGE}/extract/unzip" "UNZIP.EXE")
+        [[ -n "${UNZIP_BIN}" ]] || { echo "!! UNZIP.EXE missing - cannot build floppy" >&2; exit 1; }
+        cp "${UNZIP_BIN}" "${STAGE}/PICOGUS/UNZIP.EXE"
+    fi
+
+    # Fetch CWSDPMI.
+    echo ">> Fetching CWSDPMI: ${CWSDPMI_URL}"
+    curl -fsSL -o "${STAGE}/dl/csdpmi.zip" "${CWSDPMI_URL}"
+    mkdir -p "${STAGE}/extract/csdpmi"
+    unzip -qo "${STAGE}/dl/csdpmi.zip" -d "${STAGE}/extract/csdpmi"
+    CWSDPMI_BIN=$(find_in "${STAGE}/extract/csdpmi" "CWSDPMI.EXE")
+    [[ -n "${CWSDPMI_BIN}" ]] || { echo "!! CWSDPMI.EXE missing - cannot build floppy" >&2; exit 1; }
+
+    # Pack firmware + small drivers into PGFIRM.ZIP (DEFLATE -9, junked paths).
+    FLOPPY_STAGE="${STAGE}/floppy"
+    rm -rf "${FLOPPY_STAGE}"
+    mkdir -p "${FLOPPY_STAGE}"
+    ( cd "${STAGE}/PICOGUS" && zip -qj9 "${FLOPPY_STAGE}/PGFIRM.ZIP" \
+        PICOGUS.UF2 PG-NE2K.UF2 CTMOUSE.EXE SHSUCDX.COM UIDE.SYS UDVD2.SYS )
+
+    # INSTALL.BAT - one-shot deploy + launch.
+    cat > "${FLOPPY_STAGE}/INSTALL.BAT" <<'BAT'
+@echo off
+echo.
+echo PIGWIZ floppy edition - deploying to C:\PICOGUS\...
+echo.
+A:
+SET PATH=A:\;%PATH%
+if not exist C:\PICOGUS\NUL md C:\PICOGUS
+UNZIP.EXE -o PGFIRM.ZIP -d C:\PICOGUS\
+copy PGSETUP.EXE C:\PICOGUS\
+copy PGUSINIT.EXE C:\PICOGUS\
+copy PGINST.EXE C:\PICOGUS\
+echo.
+echo Done. Launching PGINST.EXE...
+echo.
+PGINST.EXE
+BAT
+
+    # User-facing readme for the floppy.
+    cat > "${FLOPPY_STAGE}/FLOPPY.TXT" <<EOF
+PIGWIZ ${PIGWIZ_VERSION:-dev} - floppy edition
+==============================================
+
+Insert disk, then at the A> prompt run:
+
+    INSTALL
+
+That copies the firmware and helper EXEs to C:\\PICOGUS\\ and starts
+the setup wizard. The Gravis UltraSound v4.11 patches are NOT on this
+disk (they need ~9 MB even at max compression). For GUS mode, grab
+the full bundle from the release page:
+
+    https://github.com/pacnpal/PIGWIZ/releases
+
+Files on this disk:
+  PGINST.EXE     setup wizard
+  PGSETUP.EXE    live settings manager
+  PGUSINIT.EXE   PicoGUS init/control
+  UNZIP.EXE      Info-ZIP UnZip for DOS (FreeDOS package)
+  CWSDPMI.EXE    DPMI host required by UNZIP (DJ Delorie, free)
+  PGFIRM.ZIP     firmware + helper drivers, DEFLATE-compressed
+  INSTALL.BAT    one-shot deploy + launch
+EOF
+
+    # Floppy filename mirrors the SFX naming.
+    FLOPPY_NAME="PIGWIZ-floppy-pg-${PG_TAG}.IMG"
+    if [[ -n "${PIGWIZ_VERSION:-}" && "${PIGWIZ_VERSION}" != "dev" ]]; then
+        FLOPPY_NAME="PIGWIZ-floppy-${PIGWIZ_VERSION}-pg-${PG_TAG}.IMG"
+    fi
+    FLOPPY_IMG="${OUT_DIR}/${FLOPPY_NAME}"
+
+    # Make a 1.44MB zero-filled image (2880 * 512 = 1474560 bytes).
+    dd if=/dev/zero of="${FLOPPY_IMG}" bs=512 count=2880 2>/dev/null
+    mformat -i "${FLOPPY_IMG}" -f 1440 -v PIGWIZ ::
+    mcopy -i "${FLOPPY_IMG}" \
+        "${STAGE}/PICOGUS/PGINST.EXE" \
+        "${STAGE}/PICOGUS/PGSETUP.EXE" \
+        "${STAGE}/PICOGUS/PGUSINIT.EXE" \
+        "${STAGE}/PICOGUS/UNZIP.EXE" \
+        "${CWSDPMI_BIN}" \
+        "${FLOPPY_STAGE}/PGFIRM.ZIP" \
+        "${FLOPPY_STAGE}/INSTALL.BAT" \
+        "${FLOPPY_STAGE}/FLOPPY.TXT" \
+        ::
+
+    cp "${FLOPPY_IMG}" "${OUT_DIR}/PIGWIZ-floppy-latest.IMG"
+
+    echo
+    echo ">> Floppy image written:"
+    ls -lh "${FLOPPY_IMG}" "${OUT_DIR}/PIGWIZ-floppy-latest.IMG"
+    echo
+    mdir -i "${FLOPPY_IMG}" ::
+fi
