@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 160"
      shape-rendering="crispEdges">
-  <rect width="480" height="160" fill="#FFFFFF"/>
+  <rect width="480" height="160" fill="#0000AA"/>
 
-  <rect x="0" y="0" width="480" height="2" fill="#000000"/>
-  <rect x="0" y="158" width="480" height="2" fill="#000000"/>
+  <rect x="0" y="0" width="480" height="2" fill="#FFFFFF"/>
+  <rect x="0" y="158" width="480" height="2" fill="#FFFFFF"/>
 
   <text x="240" y="92" text-anchor="middle"
         font-family="'Courier New', Courier, monospace"
         font-size="62" font-weight="700"
-        fill="#000000" letter-spacing="8">PIGWIZ</text>
+        fill="#FFFFFF" letter-spacing="8">PIGWIZ</text>
 
   <text x="240" y="124" text-anchor="middle"
         font-family="'Courier New', Courier, monospace"
         font-size="11" font-weight="400"
-        fill="#555555" letter-spacing="3">PICOGUS  DOS  SETUP  TOOLS</text>
+        fill="#AAAAAA" letter-spacing="3">PICOGUS  DOS  SETUP  TOOLS</text>
 </svg>
