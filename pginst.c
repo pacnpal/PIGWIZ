@@ -832,28 +832,43 @@ static StepAction screen_gus(Config *c) {
     tui_title_bar("PicoGUS Installer " PGWIZ_VERSION " - Gravis UltraSound Drivers");
     tui_draw_box(4, 3, 72, 18, "GUS Patch Files", 1);
 
-    tui_print_at(6, 5, TUI_WHITE, TUI_BLUE,
-        "GUS mode needs the UltraSound v4.11 patch files in C:\\ULTRASND\\.");
-    tui_print_at(6, 7, TUI_WHITE, TUI_BLUE, "C:\\ULTRASND\\..........");
-    tui_print_at(6, 8, TUI_WHITE, TUI_BLUE, "C:\\ULTRASND\\MIDI\\.....");
-    tui_print_at(6, 9, TUI_WHITE, TUI_BLUE, "C:\\ULTRASND\\PATCHES\\..");
+    {
+        int have_zip   = file_exists("ULTRASND.ZIP");
+        int have_unzip = file_exists("UNZIP.EXE");
+        int bundled    = have_zip && have_unzip;
 
-    tui_print_at(28, 7, dir_exists("C:\\ULTRASND")          ? TUI_LIGHTGREEN : TUI_LIGHTRED,
-                 TUI_BLUE,
-                 dir_exists("C:\\ULTRASND")          ? "[ ok ]" : "[ missing ]");
-    tui_print_at(28, 8, dir_exists("C:\\ULTRASND\\MIDI")    ? TUI_LIGHTGREEN : TUI_LIGHTRED,
-                 TUI_BLUE,
-                 dir_exists("C:\\ULTRASND\\MIDI")    ? "[ ok ]" : "[ missing ]");
-    tui_print_at(28, 9, dir_exists("C:\\ULTRASND\\PATCHES") ? TUI_LIGHTGREEN : TUI_LIGHTRED,
-                 TUI_BLUE,
-                 dir_exists("C:\\ULTRASND\\PATCHES") ? "[ ok ]" : "[ missing ]");
+        tui_print_at(6, 5, TUI_WHITE, TUI_BLUE,
+            "GUS mode needs the UltraSound v4.11 patch files in C:\\ULTRASND\\.");
+        tui_print_at(6, 7, TUI_WHITE, TUI_BLUE, "C:\\ULTRASND\\..........");
+        tui_print_at(6, 8, TUI_WHITE, TUI_BLUE, "C:\\ULTRASND\\MIDI\\.....");
+        tui_print_at(6, 9, TUI_WHITE, TUI_BLUE, "C:\\ULTRASND\\PATCHES\\..");
 
-    tui_print_at(6, 11, TUI_LIGHTCYAN, TUI_BLUE,
-        "Download the GUS v4.11 package and extract to C:\\ULTRASND\\.");
-    tui_print_at(6, 12, TUI_LIGHTCYAN, TUI_BLUE,
-        "The setup program in that package is NOT compatible with PicoGUS;");
-    tui_print_at(6, 13, TUI_LIGHTCYAN, TUI_BLUE,
-        "do not run it.");
+        tui_print_at(28, 7, dir_exists("C:\\ULTRASND")          ? TUI_LIGHTGREEN : TUI_LIGHTRED,
+                     TUI_BLUE,
+                     dir_exists("C:\\ULTRASND")          ? "[ ok ]" : "[ missing ]");
+        tui_print_at(28, 8, dir_exists("C:\\ULTRASND\\MIDI")    ? TUI_LIGHTGREEN : TUI_LIGHTRED,
+                     TUI_BLUE,
+                     dir_exists("C:\\ULTRASND\\MIDI")    ? "[ ok ]" : "[ missing ]");
+        tui_print_at(28, 9, dir_exists("C:\\ULTRASND\\PATCHES") ? TUI_LIGHTGREEN : TUI_LIGHTRED,
+                     TUI_BLUE,
+                     dir_exists("C:\\ULTRASND\\PATCHES") ? "[ ok ]" : "[ missing ]");
+
+        if (bundled) {
+            tui_print_at(6, 11, TUI_LIGHTGREEN, TUI_BLUE,
+                "GUS v4.11 + Pro Patches Lite 1.61 (anti-loop fix) bundled.");
+            tui_print_at(6, 12, TUI_LIGHTGREEN, TUI_BLUE,
+                "Installer will extract them to C:\\ULTRASND\\ in the next step.");
+            tui_print_at(6, 13, TUI_WHITE,      TUI_BLUE,
+                "(Source: ULTRASND.ZIP + UNZIP.EXE next to PGINST.EXE.)");
+        } else {
+            tui_print_at(6, 11, TUI_LIGHTCYAN, TUI_BLUE,
+                "Download the GUS v4.11 package and extract to C:\\ULTRASND\\.");
+            tui_print_at(6, 12, TUI_LIGHTCYAN, TUI_BLUE,
+                "The setup program in that package is NOT compatible with PicoGUS;");
+            tui_print_at(6, 13, TUI_LIGHTCYAN, TUI_BLUE,
+                "do not run it.");
+        }
+    }
 
     {
         char buf[64];
@@ -1102,6 +1117,18 @@ static StepAction screen_install(Config *c) {
         step_line(row++, "Create C:\\ULTRASND\\MIDI\\", rc == 0 || dir_exists("C:\\ULTRASND\\MIDI"));
         rc = make_dir("C:\\ULTRASND\\PATCHES");
         step_line(row++, "Create C:\\ULTRASND\\PATCHES\\", rc == 0 || dir_exists("C:\\ULTRASND\\PATCHES"));
+
+        /* If the bundled GUS driver/patch zip is sitting next to us
+         * (ULTRASNDPPL161FIX repackaged as ULTRASND.ZIP), unzip it into
+         * C:\ULTRASND\. UNZIP.EXE is Info-ZIP for DOS; -d preserves the
+         * MIDI\ / PATCHES\ subdirs from inside the archive. */
+        if (file_exists("ULTRASND.ZIP") && file_exists("UNZIP.EXE")) {
+            rc = system("UNZIP -o -q ULTRASND.ZIP -d C:\\ULTRASND");
+            step_line(row++,
+                rc == 0 ? "Extract GUS v4.11 + PPL 1.61 -> C:\\ULTRASND\\"
+                        : "UNZIP returned an error - patches not installed",
+                rc == 0);
+        }
     }
 
     /* Copy PGUSINIT if it is next to us and not already installed. */

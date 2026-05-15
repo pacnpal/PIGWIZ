@@ -35,6 +35,28 @@ SHSUCDX_URL="https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/shsucd
 UIDE_URL="https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/cdrom/uide/uide/2020-07-04b/UIDE.zip"
 UDVD2_URL="https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/cdrom/uide/udvd2/2015-03-05d/UDVD2.zip"
 
+# ---------------------------------------------------------------------
+# Gravis UltraSound driver patches.
+#
+# Payload: ULTRASNDPPL161FIX.zip - the GUS v4.11 driver tree with Pro
+# Patches Lite 1.61 and the anti-loop fix pre-applied. Required for GUS
+# mode on PicoGUS. Not FreeDOS-licensed, but mirrored by the Internet
+# Archive's "Gravis UltraSound DOS Driver Package" item, which is where
+# we fetch from by default. Resolution order:
+#
+#   1. $GUS_PATCHES_LOCAL on disk (defaults to assets/ULTRASNDPPL161FIX.zip)
+#   2. curl $GUS_PATCHES_URL
+#
+# If both fail, bundle.sh still succeeds - the installer just keeps its
+# "Download the GUS v4.11 package..." prompt at runtime.
+#
+# UNZIP_URL points at Info-ZIP's DOS self-extractor; we unwrap it on the
+# host to pull a bare UNZIP.EXE that ships alongside the patches.
+# ---------------------------------------------------------------------
+GUS_PATCHES_URL="${GUS_PATCHES_URL:-https://archive.org/download/GravisUltrasoundDOSDriverPackage/ultrasound.zip/ULTRASNDPPL161FIX.zip}"
+GUS_PATCHES_LOCAL="${GUS_PATCHES_LOCAL:-${REPO}/assets/ULTRASNDPPL161FIX.zip}"
+UNZIP_URL="${UNZIP_URL:-https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/util/file/unzip/unz552xn.exe}"
+
 require() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "!! Missing required tool: $1" >&2
@@ -42,6 +64,7 @@ require() {
     }
 }
 require curl
+require wget
 require unzip
 require zip
 require python3
@@ -100,6 +123,110 @@ fetch_unzip uide    "${UIDE_URL}"
 fetch_unzip udvd2   "${UDVD2_URL}"
 
 # ---------------------------------------------------------------------
+# GUS v4.11 patches + a DOS UNZIP.EXE to extract them at install time.
+# By default we pull from archive.org; either source may be unreachable
+# (offline build, transient 502, user blanked GUS_PATCHES_URL=) - in
+# that case the installer silently falls back to its "download
+# yourself" prompt for GUS mode and the bundle still ships.
+# ---------------------------------------------------------------------
+HAVE_GUS_PATCHES=0
+GUS_ZIP_SRC=""
+
+if [[ -f "${GUS_PATCHES_LOCAL}" ]]; then
+    echo ">> Using local GUS v4.11 patches: ${GUS_PATCHES_LOCAL}"
+    GUS_ZIP_SRC="${GUS_PATCHES_LOCAL}"
+elif [[ -n "${GUS_PATCHES_URL}" ]]; then
+    echo ">> Fetching GUS v4.11 patches: ${GUS_PATCHES_URL}"
+    # wget (not curl) because archive.org's /download/<item>/<container>/<file>
+    # URLs 302 to a dynamic ia######.us.archive.org/view_archive.php endpoint
+    # whose host varies by load balancer. wget follows redirects by default
+    # and handles the resulting query-string URL cleanly.
+    #
+    # -4 forces IPv4: some archive.org mirror hostnames return a bogus
+    # ::/0.0.0.0 AAAA record that breaks dual-stack resolvers (seen on
+    # macOS homebrew wget). Sticking to IPv4 avoids it.
+    #
+    # The retry loop re-invokes wget (not --tries) so each attempt goes
+    # back through the archive.org load balancer and gets a fresh mirror
+    # - retrying the same dead ia###### host is pointless.
+    gus_fetched=0
+    for attempt in 1 2 3 4 5; do
+        if wget -4 -nv --timeout=30 \
+                -O "${STAGE}/dl/ULTRASND.zip" "${GUS_PATCHES_URL}"; then
+            gus_fetched=1
+            break
+        fi
+        rm -f "${STAGE}/dl/ULTRASND.zip"
+        echo "   attempt ${attempt}/5 failed - retrying through a fresh mirror in 5s..."
+        sleep 5
+    done
+    if [[ "${gus_fetched}" -eq 1 ]]; then
+        GUS_ZIP_SRC="${STAGE}/dl/ULTRASND.zip"
+    else
+        echo "!! All 5 fetch attempts failed - continuing without GUS patches" >&2
+    fi
+else
+    echo ">> No GUS_PATCHES_URL / ${GUS_PATCHES_LOCAL#${REPO}/} - bundle will"
+    echo "   ship without GUS patches; installer prompts the user to fetch them."
+fi
+
+if [[ -n "${GUS_ZIP_SRC}" ]]; then
+    # Quick sanity check: must be a real zip.
+    if unzip -l "${GUS_ZIP_SRC}" >/dev/null 2>&1; then
+        # Normalise the zip layout. The canonical ULTRASNDPPL161FIX.zip
+        # has a single "ULTRASND/" wrap directory at the top - if we
+        # ship that as-is, PGINST's `UNZIP -d C:\ULTRASND` would nest
+        # everything at C:\ULTRASND\ULTRASND\. Detect the wrap and
+        # repack flat; tolerate already-flat zips too.
+        echo ">> Normalising GUS zip layout..."
+        gus_extract="${STAGE}/extract/gus-patches"
+        rm -rf "${gus_extract}"
+        mkdir -p "${gus_extract}"
+        unzip -qo "${GUS_ZIP_SRC}" -d "${gus_extract}"
+        shopt -s nullglob
+        gus_top=( "${gus_extract}"/* )
+        shopt -u nullglob
+        if [[ ${#gus_top[@]} -eq 1 && -d "${gus_top[0]}" ]]; then
+            echo "   stripping wrap dir: $(basename "${gus_top[0]}")"
+            gus_pack_dir="${gus_top[0]}"
+        else
+            echo "   zip already flat"
+            gus_pack_dir="${gus_extract}"
+        fi
+        rm -f "${STAGE}/dl/ULTRASND-flat.zip"
+        ( cd "${gus_pack_dir}" && zip -qr "${STAGE}/dl/ULTRASND-flat.zip" . )
+        GUS_ZIP_SRC="${STAGE}/dl/ULTRASND-flat.zip"
+
+        # Fetch and unwrap Info-ZIP UNZIP.EXE. The vendor distributes it
+        # as a DOS self-extracting EXE, but those are just zip files with
+        # a stub prepended - `unzip` on the host will happily skip the
+        # stub and pull UNZIP.EXE out.
+        echo ">> Fetching Info-ZIP UNZIP.EXE: ${UNZIP_URL}"
+        if curl -fsSL -o "${STAGE}/dl/unzip-sfx.exe" "${UNZIP_URL}"; then
+            mkdir -p "${STAGE}/extract/unzip"
+            if unzip -qo "${STAGE}/dl/unzip-sfx.exe" \
+                    -d "${STAGE}/extract/unzip" 2>/dev/null; then
+                UNZIP_BIN=$(find "${STAGE}/extract/unzip" -iname "UNZIP.EXE" -type f -print -quit)
+                if [[ -n "${UNZIP_BIN}" ]]; then
+                    cp "${GUS_ZIP_SRC}" "${STAGE}/PICOGUS/ULTRASND.ZIP"
+                    cp "${UNZIP_BIN}"   "${STAGE}/PICOGUS/UNZIP.EXE"
+                    HAVE_GUS_PATCHES=1
+                    echo ">> Bundled ULTRASND.ZIP ($(stat -f%z "${STAGE}/PICOGUS/ULTRASND.ZIP" 2>/dev/null || stat -c%s "${STAGE}/PICOGUS/ULTRASND.ZIP") bytes) + UNZIP.EXE"
+                else
+                    echo "!! UNZIP.EXE not found inside ${UNZIP_URL##*/}; skipping GUS bundle" >&2
+                fi
+            else
+                echo "!! Could not unwrap ${UNZIP_URL##*/}; skipping GUS bundle" >&2
+            fi
+        else
+            echo "!! Failed to fetch UNZIP_URL; skipping GUS bundle" >&2
+        fi
+    else
+        echo "!! ${GUS_ZIP_SRC} is not a valid zip; skipping GUS bundle" >&2
+    fi
+fi
+
+# ---------------------------------------------------------------------
 # Assemble PICOGUS/ directory. Use a tolerant copy-by-name so we cope
 # with archives that use different case for filenames.
 # ---------------------------------------------------------------------
@@ -140,7 +267,8 @@ fi
 # Bundle-level README explaining provenance and licences. Name stays
 # inside DOS 8.3 so the SFX (16-char name slot) can carry it too.
 # ---------------------------------------------------------------------
-cat > "${STAGE}/PICOGUS/PIGWIZ.TXT" <<EOF
+{
+    cat <<EOF
 PIGWIZ - PicoGUS DOS setup tools bundle
 ========================================
 Built against PicoGUS upstream release: ${PG_TAG}
@@ -157,6 +285,17 @@ SHSUCDX.COM    MSCDEX-compatible CD-ROM filesystem extension (FreeDOS)
 UIDE.SYS       ATAPI/IDE CD-ROM driver (FreeDOS)
 UDVD2.SYS      ATAPI CD/DVD driver alternative (FreeDOS)
 PICOGUS.MD     Upstream PicoGUS README
+EOF
+    if [[ "${HAVE_GUS_PATCHES}" -eq 1 ]]; then
+        cat <<EOF
+ULTRASND.ZIP   Gravis UltraSound v4.11 driver with Pro Patches Lite 1.61
+               + anti-loop fix pre-applied. PGINST.EXE extracts it into
+               C:\\ULTRASND\\ when GUS mode is selected.
+UNZIP.EXE      Info-ZIP UnZip for DOS (used by PGINST to extract the
+               patches above)
+EOF
+    fi
+    cat <<EOF
 
 Licences
 --------
@@ -166,6 +305,20 @@ CTMOUSE.EXE               GPLv2 (CuteMouse)
 SHSUCDX.COM               GPLv2 (Jason Hood / Eric Auer)
 UIDE.SYS                  Public domain (Jack Ellis)
 UDVD2.SYS                 Public domain (Jack Ellis)
+EOF
+    if [[ "${HAVE_GUS_PATCHES}" -eq 1 ]]; then
+        cat <<EOF
+UNZIP.EXE                 Info-ZIP licence (BSD-like, freely distributable)
+ULTRASND.ZIP              Gravis UltraSound v4.11 driver (Advanced Gravis,
+                          retained under the long-standing community
+                          practice of mirroring their abandoned DOS
+                          driver kit) plus Pro Patches Lite 1.61
+                          (community-maintained patch replacement set,
+                          GameSrv / Tom Klok et al) with the anti-loop
+                          fix already applied. Not relicenced.
+EOF
+    fi
+    cat <<EOF
 
 Recommended install
 -------------------
@@ -177,6 +330,7 @@ For firmware upgrades:
   PGUSINIT /flash PICOGUS.UF2
   PGUSINIT /flash PG-NE2K.UF2  (NE2000 build only)
 EOF
+} > "${STAGE}/PICOGUS/PIGWIZ.TXT"
 
 # ---------------------------------------------------------------------
 # Pick a bundle filename. CI passes BUNDLE_VERSION (the PIGWIZ release
@@ -224,19 +378,28 @@ if [[ -n "${PIGWIZ_VERSION:-}" && "${PIGWIZ_VERSION}" != "dev" ]]; then
 fi
 
 echo ">> Packing self-extracting EXE..."
+SFX_FILES=(
+    "${STAGE}/PICOGUS/PGINST.EXE"
+    "${STAGE}/PICOGUS/PGSETUP.EXE"
+    "${STAGE}/PICOGUS/PGUSINIT.EXE"
+    "${STAGE}/PICOGUS/PICOGUS.UF2"
+    "${STAGE}/PICOGUS/PG-NE2K.UF2"
+    "${STAGE}/PICOGUS/CTMOUSE.EXE"
+    "${STAGE}/PICOGUS/SHSUCDX.COM"
+    "${STAGE}/PICOGUS/UIDE.SYS"
+    "${STAGE}/PICOGUS/UDVD2.SYS"
+    "${STAGE}/PICOGUS/PIGWIZ.TXT"
+)
+if [[ "${HAVE_GUS_PATCHES}" -eq 1 ]]; then
+    SFX_FILES+=(
+        "${STAGE}/PICOGUS/ULTRASND.ZIP"
+        "${STAGE}/PICOGUS/UNZIP.EXE"
+    )
+fi
 python3 "${REPO}/pack-bundle.py" \
     --stub "${STUB}" \
     --out  "${OUT_DIR}/${SFX_NAME}" \
-    "${STAGE}/PICOGUS/PGINST.EXE" \
-    "${STAGE}/PICOGUS/PGSETUP.EXE" \
-    "${STAGE}/PICOGUS/PGUSINIT.EXE" \
-    "${STAGE}/PICOGUS/PICOGUS.UF2" \
-    "${STAGE}/PICOGUS/PG-NE2K.UF2" \
-    "${STAGE}/PICOGUS/CTMOUSE.EXE" \
-    "${STAGE}/PICOGUS/SHSUCDX.COM" \
-    "${STAGE}/PICOGUS/UIDE.SYS" \
-    "${STAGE}/PICOGUS/UDVD2.SYS" \
-    "${STAGE}/PICOGUS/PIGWIZ.TXT"
+    "${SFX_FILES[@]}"
 
 cp "${OUT_DIR}/${SFX_NAME}" "${OUT_DIR}/PGBUNDLE-latest.EXE"
 

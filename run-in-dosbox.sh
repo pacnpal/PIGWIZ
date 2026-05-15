@@ -75,6 +75,20 @@ if [[ -n "${sfx}" ]]; then
     cp "${sfx}" "${DRIVE}/PGBUNDLE.EXE"
 fi
 
+# Optional: if you've dropped the GUS driver/patch zip (e.g.
+# ULTRASNDPPL161FIX.zip) + a DOS UNZIP.EXE under ${REPO}/assets/, stage
+# them alongside PGINST.EXE so the installer's GUS screen exercises the
+# "bundled patches" path instead of the "download yourself" fallback.
+GUS_ASSET=""
+for cand in "${REPO}/assets/ULTRASNDPPL161FIX.zip" \
+            "${REPO}/assets/ULTRASND-411.zip"; do
+    [[ -f "${cand}" ]] && GUS_ASSET="${cand}" && break
+done
+if [[ -n "${GUS_ASSET}" && -f "${REPO}/assets/UNZIP.EXE" ]]; then
+    cp "${GUS_ASSET}"             "${DRIVE}/ULTRASND.ZIP"
+    cp "${REPO}/assets/UNZIP.EXE" "${DRIVE}/UNZIP.EXE"
+fi
+
 # Drop in a stub PGUSINIT.EXE that just echoes plausible status text so
 # the installer/settings UI can call it without a real PicoGUS card.
 # DOS .BAT can be used in place of an EXE if we put it on the search path

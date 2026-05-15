@@ -6,3 +6,7 @@ outputs/
 dosbox-artifacts/
 .bundle-stage/
 .claude/
+# Local-only drop-in dir for the GUS v4.11 / PPL 1.61 zip and a DOS
+# UNZIP.EXE. Bundle.sh reads from here; nothing in here should ever be
+# committed (the patches are not FreeDOS-licensed - see PIGWIZ.TXT).
+assets/

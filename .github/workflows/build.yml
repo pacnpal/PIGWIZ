@@ -102,7 +102,7 @@ jobs:
       - name: Install bundling tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -qq -y zip unzip curl python3
+          sudo apt-get install -qq -y zip unzip curl wget python3
 
       - name: Pull built EXEs from the build job
         uses: actions/download-artifact@v4
@@ -113,6 +113,12 @@ jobs:
       - name: Assemble zip distro + self-extracting EXE
         env:
           PIGWIZ_VERSION: ${{ needs.build.outputs.version }}
+          # Optional: set the GUS_PATCHES_URL secret to a zip of the
+          # Gravis UltraSound v4.11 driver kit, and bundle.sh will pack
+          # it (plus a DOS UNZIP.EXE) into the release so PGINST.EXE can
+          # auto-deploy patches to C:\ULTRASND\. Unset = same behaviour
+          # as before: installer prompts the user to fetch them.
+          GUS_PATCHES_URL: ${{ secrets.GUS_PATCHES_URL }}
         run: |
           ./bundle.sh
           echo
