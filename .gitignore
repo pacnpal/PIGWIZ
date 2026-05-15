@@ -1,1 +1,8 @@
 picogus/
+*.o
+*.exe
+*.EXE
+outputs/
+dosbox-artifacts/
+.bundle-stage/
+.claude/
