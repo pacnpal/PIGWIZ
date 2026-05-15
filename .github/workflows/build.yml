@@ -71,7 +71,10 @@ jobs:
 
       - name: Verify MZ headers
         run: |
-          file pginst.exe pgsetup.exe pgbundle.exe
+          # NB: no `file` here - the Open Watcom container is minimal
+          # and ships without it. The MZ magic-byte check is the real
+          # verification anyway.
+          ls -la pginst.exe pgsetup.exe pgbundle.exe
           head -c 2 pginst.exe   | grep -q "^MZ"
           head -c 2 pgsetup.exe  | grep -q "^MZ"
           head -c 2 pgbundle.exe | grep -q "^MZ"
