@@ -1110,6 +1110,18 @@ static StepAction screen_install(Config *c) {
     rc = make_dir("C:\\PICOGUS");
     step_line(row++, "Create C:\\PICOGUS\\",  rc == 0 || dir_exists("C:\\PICOGUS"));
 
+    /* Floppy edition: if PGFIRM.ZIP is sitting next to us, extract the
+     * bundled firmware + helper drivers into C:\PICOGUS\. UNZIP.EXE +
+     * CWSDPMI.EXE need to be on the search path (sibling files work
+     * because we chdir'd to our own directory at startup). */
+    if (file_exists("PGFIRM.ZIP") && file_exists("UNZIP.EXE")) {
+        rc = system("UNZIP -o -q PGFIRM.ZIP -d C:\\PICOGUS");
+        step_line(row++,
+            rc == 0 ? "Extract bundled firmware -> C:\\PICOGUS\\"
+                    : "UNZIP returned an error - firmware not installed",
+            rc == 0);
+    }
+
     if (c->mode == MODE_GUS) {
         rc = make_dir("C:\\ULTRASND");
         step_line(row++, "Create C:\\ULTRASND\\", rc == 0 || dir_exists("C:\\ULTRASND"));
@@ -1118,10 +1130,16 @@ static StepAction screen_install(Config *c) {
         rc = make_dir("C:\\ULTRASND\\PATCHES");
         step_line(row++, "Create C:\\ULTRASND\\PATCHES\\", rc == 0 || dir_exists("C:\\ULTRASND\\PATCHES"));
 
-        /* If the bundled GUS driver/patch zip is sitting next to us
-         * (ULTRASNDPPL161FIX repackaged as ULTRASND.ZIP), unzip it into
-         * C:\ULTRASND\. UNZIP.EXE is Info-ZIP for DOS; -d preserves the
-         * MIDI\ / PATCHES\ subdirs from inside the archive. */
+        /* Floppy edition: small GUS driver config (PPL + INI). */
+        if (file_exists("PGGUS.ZIP") && file_exists("UNZIP.EXE")) {
+            rc = system("UNZIP -o -q PGGUS.ZIP -d C:\\ULTRASND");
+            step_line(row++,
+                rc == 0 ? "Extract GUS driver config -> C:\\ULTRASND\\"
+                        : "UNZIP returned an error on PGGUS.ZIP",
+                rc == 0);
+        }
+
+        /* Full bundle: the GUS v4.11 + PPL 1.61 patch tree. */
         if (file_exists("ULTRASND.ZIP") && file_exists("UNZIP.EXE")) {
             rc = system("UNZIP -o -q ULTRASND.ZIP -d C:\\ULTRASND");
             step_line(row++,
@@ -1131,11 +1149,26 @@ static StepAction screen_install(Config *c) {
         }
     }
 
-    /* Copy PGUSINIT if it is next to us and not already installed. */
-    if (file_exists("PGUSINIT.EXE")
-        && !file_exists("C:\\PICOGUS\\PGUSINIT.EXE")) {
-        rc = copy_file("PGUSINIT.EXE", "C:\\PICOGUS\\PGUSINIT.EXE");
-        step_line(row++, "Copy PGUSINIT.EXE -> C:\\PICOGUS\\", rc == 0);
+    /* Copy any loose sibling EXEs into C:\PICOGUS\ so they're available
+     * after install without keeping the install medium around. Used by
+     * the floppy edition where PGINST etc are loose on A: instead of
+     * inside the SFX. */
+    {
+        static const char *const SIBLINGS[] = {
+            "PGINST.EXE", "PGSETUP.EXE", "PGUSINIT.EXE",
+            "UNZIP.EXE", "CWSDPMI.EXE"
+        };
+        int i;
+        for (i = 0; i < (int)(sizeof(SIBLINGS) / sizeof(SIBLINGS[0])); i++) {
+            char dst[64];
+            sprintf(dst, "C:\\PICOGUS\\%s", SIBLINGS[i]);
+            if (file_exists(SIBLINGS[i]) && !file_exists(dst)) {
+                char label[80];
+                rc = copy_file(SIBLINGS[i], dst);
+                sprintf(label, "Copy %s -> C:\\PICOGUS\\", SIBLINGS[i]);
+                step_line(row++, label, rc == 0);
+            }
+        }
     }
 
     /* Write the helper batches. */
@@ -1244,10 +1277,33 @@ static StepAction screen_complete(Config *c) {
 /* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
-int main(void) {
+/* Make sibling-file logic (file_exists("PGFIRM.ZIP"), etc.) work
+ * regardless of where the user invoked us from. DOS gives us the full
+ * path of the EXE in argv[0]; chdir there at startup. Mostly matters
+ * for the floppy edition where the user types A:\PGINST from C:. */
+static void chdir_to_self(const char *argv0) {
+    char drive[_MAX_DRIVE];
+    char dir[_MAX_DIR];
+    char path[_MAX_PATH];
+
+    if (!argv0 || !argv0[0]) return;
+    _splitpath(argv0, drive, dir, NULL, NULL);
+    _makepath(path, drive, dir, NULL, NULL);
+    if (drive[0]) {
+        (void)_chdrive(toupper((unsigned char)drive[0]) - 'A' + 1);
+    }
+    if (path[0]) {
+        (void)chdir(path);
+    }
+}
+
+int main(int argc, char **argv) {
     Config cfg;
     int step = 0;
     StepAction a = ACT_NEXT;
+
+    (void)argc;
+    if (argv && argv[0]) chdir_to_self(argv[0]);
 
     cfg_defaults(&cfg);
     tui_init();

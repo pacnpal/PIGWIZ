@@ -422,8 +422,9 @@ ls -lh "${OUT_DIR}/${SFX_NAME}" "${OUT_DIR}/PGBUNDLE-latest.EXE"
 # everything else: setup wizard, settings manager, PGUSINIT, both
 # firmware UF2s, the four FreeDOS helper drivers, plus Info-ZIP UnZip
 # and CWSDPMI on the DOS side. Firmware + drivers go into PGFIRM.ZIP
-# (DEFLATE -9, ~786 KB) and an A:\INSTALL.BAT extracts them to
-# C:\PICOGUS\ then launches PGINST.EXE.
+# (DEFLATE -9, ~786 KB). PGINST.EXE itself detects PGFIRM.ZIP /
+# PGGUS.ZIP siblings and extracts them during install - no INSTALL.BAT
+# wrapper, user just runs PGINST directly.
 #
 # Requires mtools (mformat + mcopy) on the host. Skipped non-fatally
 # if mtools is absent.
@@ -489,26 +490,11 @@ else
         fi
     fi
 
-    # INSTALL.BAT - one-shot deploy + launch.
-    cat > "${FLOPPY_STAGE}/INSTALL.BAT" <<'BAT'
-@echo off
-echo.
-echo PIGWIZ floppy edition - deploying...
-echo.
-A:
-SET PATH=A:\;%PATH%
-if not exist C:\PICOGUS\NUL md C:\PICOGUS
-UNZIP.EXE -o PGFIRM.ZIP -d C:\PICOGUS\
-if exist PGGUS.ZIP md C:\ULTRASND
-if exist PGGUS.ZIP UNZIP.EXE -o PGGUS.ZIP -d C:\ULTRASND\
-copy PGSETUP.EXE C:\PICOGUS\
-copy PGUSINIT.EXE C:\PICOGUS\
-copy PGINST.EXE C:\PICOGUS\
-echo.
-echo Done. Launching PGINST.EXE...
-echo.
-PGINST.EXE
-BAT
+    # No INSTALL.BAT - PGINST.EXE handles its own sibling detection
+    # and extraction (PGFIRM.ZIP -> C:\PICOGUS\, PGGUS.ZIP ->
+    # C:\ULTRASND\, copies loose EXEs to C:\PICOGUS\). It chdir's to
+    # its own directory at startup so this works whether the user
+    # types A:\PGINST or PGINST from a different drive.
 
     # User-facing readme for the floppy.
     cat > "${FLOPPY_STAGE}/FLOPPY.TXT" <<EOF
@@ -517,28 +503,30 @@ PIGWIZ ${PIGWIZ_VERSION:-dev} - floppy edition
 
 Insert disk, then at the A> prompt run:
 
-    INSTALL
+    PGINST
 
-That copies the firmware and helper EXEs to C:\\PICOGUS\\ and starts
-the setup wizard. The 11 MB of Gravis UltraSound v4.11 .PAT audio
-samples are NOT on this disk - they cannot lossless-compress below
-~9 MB and LZMA on 16-bit DOS hits a wall (256 KB minimum dictionary,
-640 KB conventional memory).
+PGINST chdir's to its own location, detects PGFIRM.ZIP / PGGUS.ZIP
+next to itself, and extracts both into C:\\PICOGUS\\ and C:\\ULTRASND\\
+during the install step. Loose EXEs (PGSETUP, PGUSINIT, UNZIP,
+CWSDPMI, PGINST itself) get copied to C:\\PICOGUS\\ at the end so the
+hard disk install stands alone after.
 
-If you want full GUS-mode audio, grab the patches from the full
-release bundle and drop them in C:\\ULTRASND\\MIDI\\:
+The 11 MB of Gravis UltraSound v4.11 .PAT audio samples are NOT on
+this disk - they cannot lossless-compress below ~9 MB and LZMA on
+16-bit DOS hits a wall (256 KB minimum dictionary, 640 KB conventional
+memory). For full GUS-mode audio, grab patches from the full release
+bundle and drop them in C:\\ULTRASND\\MIDI\\:
 
     https://github.com/pacnpal/PIGWIZ/releases
 
 Files on this disk:
-  PGINST.EXE     setup wizard
+  PGINST.EXE     setup wizard (run this)
   PGSETUP.EXE    live settings manager
   PGUSINIT.EXE   PicoGUS init/control
   UNZIP.EXE      Info-ZIP UnZip for DOS (FreeDOS package)
   CWSDPMI.EXE    DPMI host required by UNZIP (DJ Delorie, free)
   PGFIRM.ZIP     firmware + helper drivers, DEFLATE-compressed
   PGGUS.ZIP      GUS driver config (PPL + INI), if available
-  INSTALL.BAT    one-shot deploy + launch
 EOF
 
     # Floppy filename mirrors the SFX naming.
@@ -558,7 +546,6 @@ EOF
         "${STAGE}/PICOGUS/UNZIP.EXE"
         "${CWSDPMI_BIN}"
         "${FLOPPY_STAGE}/PGFIRM.ZIP"
-        "${FLOPPY_STAGE}/INSTALL.BAT"
         "${FLOPPY_STAGE}/FLOPPY.TXT"
     )
     if [[ "${FLOPPY_HAS_GUS}" -eq 1 ]]; then
