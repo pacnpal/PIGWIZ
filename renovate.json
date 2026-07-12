@@ -10,7 +10,7 @@
   "labels": ["dependencies"],
   "prHourlyLimit": 2,
   "prConcurrentLimit": 10,
-  "platformAutomerge": true,
+  "platformAutomerge": false,
   "minimumReleaseAge": "3 days",
   "internalChecksFilter": "strict",
   "packageRules": [
@@ -19,6 +19,12 @@
       "matchManagers": ["github-actions"],
       "matchDepTypes": ["container", "service"],
       "pinDigests": true
+    },
+    {
+      "description": "Exempt pin/digest updates from the release-age cooldown. GitHub Actions digest refreshes carry no release timestamp, so under minimumReleaseAge + strict internal checks they would sit pending forever and pinned SHAs would stop refreshing. The cooldown still applies to version (minor/patch/major) updates.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["pin", "pinDigest", "digest"],
+      "minimumReleaseAge": null
     },
     {
       "description": "Automerge non-major GitHub Actions updates once required checks pass",
