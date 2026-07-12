@@ -27,6 +27,12 @@
       "automerge": true
     },
     {
+      "description": "Require manual review for actions the PR build never exercises (they only run in the bundle/release-only jobs, so a green PR build does not validate them)",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["actions/download-artifact", "softprops/action-gh-release"],
+      "automerge": false
+    },
+    {
       "description": "Hold major updates for manual review via the Dependency Dashboard",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
