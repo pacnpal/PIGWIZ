@@ -28,6 +28,10 @@ on:
         description: "Version string baked into the EXEs (e.g. v1.2.3)"
         required: false
         default: "dev"
+  # Compile on pull requests so dependency updates (e.g. Renovate action
+  # bumps) are validated before merge. Only the `build` job runs on PRs -
+  # see its `if` guard on the heavier `bundle` job below.
+  pull_request:
   release:
     types: [published]
 
@@ -96,6 +100,9 @@ jobs:
 
   bundle:
     needs: build
+    # Skip the packaging pipeline (and its external downloads) on PRs;
+    # PR runs only need the `build` job's compile + MZ-header check.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:

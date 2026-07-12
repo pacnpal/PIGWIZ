@@ -15,6 +15,12 @@
   "internalChecksFilter": "strict",
   "packageRules": [
     {
+      "description": "Pin workflow job container and service images to immutable digests",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["container", "service"],
+      "pinDigests": true
+    },
+    {
       "description": "Automerge non-major GitHub Actions updates once required checks pass",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
