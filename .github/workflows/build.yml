@@ -28,11 +28,18 @@ on:
         description: "Version string baked into the EXEs (e.g. v1.2.3)"
         required: false
         default: "dev"
+  # Compile on pull requests so dependency updates (e.g. Renovate action
+  # bumps) are validated before merge. Only the `build` job runs on PRs -
+  # see its `if` guard on the heavier `bundle` job below.
+  pull_request:
   release:
     types: [published]
 
+# Default every job to read-only. PR runs (and the build/bundle jobs)
+# never need to write repository contents; only the release-attachment
+# job does, and it opts in explicitly below.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -40,6 +47,14 @@ jobs:
     container:
       image: pangbox/openwatcom-action:latest
       options: --entrypoint /bin/sh
+
+    # The Open Watcom container ships an old Alpine whose musl libc lacks
+    # symbols (e.g. pthread_getname_np) required by the Node 24 binary the
+    # runner now injects for JS actions like actions/checkout. Fall back to
+    # Node 20, which runs against the container's musl, until the base
+    # image is refreshed.
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
     outputs:
       version: ${{ steps.version.outputs.value }}
@@ -96,6 +111,9 @@ jobs:
 
   bundle:
     needs: build
+    # Skip the packaging pipeline (and its external downloads) on PRs;
+    # PR runs only need the `build` job's compile + MZ-header check.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -146,6 +164,9 @@ jobs:
     needs: [build, bundle]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    # Only this job writes to the repo (uploading assets to the release).
+    permissions:
+      contents: write
     steps:
       - name: Download release artifact
         uses: actions/download-artifact@v4

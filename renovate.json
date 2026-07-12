@@ -1,0 +1,47 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "America/New_York",
+  "schedule": ["* 0-4 * * 1-5", "* * * * 0,6"],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 10,
+  "platformAutomerge": false,
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "packageRules": [
+    {
+      "description": "Pin workflow job container and service images to immutable digests",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["container", "service"],
+      "pinDigests": true
+    },
+    {
+      "description": "Exempt pin/digest updates from the release-age cooldown. GitHub Actions digest refreshes carry no release timestamp, so under minimumReleaseAge + strict internal checks they would sit pending forever and pinned SHAs would stop refreshing. The cooldown still applies to version (minor/patch/major) updates.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["pin", "pinDigest", "digest"],
+      "minimumReleaseAge": null
+    },
+    {
+      "description": "Automerge non-major GitHub Actions updates once required checks pass",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Require manual review for actions the PR build never exercises (they only run in the bundle/release-only jobs, so a green PR build does not validate them)",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["actions/download-artifact", "softprops/action-gh-release"],
+      "automerge": false
+    },
+    {
+      "description": "Hold major updates for manual review via the Dependency Dashboard",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
