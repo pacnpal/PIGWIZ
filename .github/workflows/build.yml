@@ -35,8 +35,11 @@ on:
   release:
     types: [published]
 
+# Default every job to read-only. PR runs (and the build/bundle jobs)
+# never need to write repository contents; only the release-attachment
+# job does, and it opts in explicitly below.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -161,6 +164,9 @@ jobs:
     needs: [build, bundle]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    # Only this job writes to the repo (uploading assets to the release).
+    permissions:
+      contents: write
     steps:
       - name: Download release artifact
         uses: actions/download-artifact@v4
