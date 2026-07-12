@@ -45,6 +45,14 @@ jobs:
       image: pangbox/openwatcom-action:latest
       options: --entrypoint /bin/sh
 
+    # The Open Watcom container ships an old Alpine whose musl libc lacks
+    # symbols (e.g. pthread_getname_np) required by the Node 24 binary the
+    # runner now injects for JS actions like actions/checkout. Fall back to
+    # Node 20, which runs against the container's musl, until the base
+    # image is refreshed.
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
     outputs:
       version: ${{ steps.version.outputs.value }}
 
