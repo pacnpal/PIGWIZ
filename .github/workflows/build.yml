@@ -45,7 +45,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: pangbox/openwatcom-action:latest
+      image: pangbox/openwatcom-action:latest@sha256:b71635b2df98820e5bfdd3137b5b0906052c4972438420f4af2f38bee95b9a83
       options: --entrypoint /bin/sh
 
     # The Open Watcom container ships an old Alpine whose musl libc lacks
@@ -61,7 +61,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Resolve version
         id: version
@@ -103,7 +103,7 @@ jobs:
           ls -lh outputs/
 
       - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pigwiz-exes-${{ steps.version.outputs.value }}
           path: outputs/*.EXE
@@ -118,7 +118,7 @@ jobs:
 
     steps:
       - name: Checkout (needed for bundle.sh + pack-bundle.py)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install bundling tools
         run: |
@@ -126,7 +126,7 @@ jobs:
           sudo apt-get install -qq -y zip unzip curl wget python3 mtools
 
       - name: Pull built EXEs from the build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: pigwiz-exes-${{ needs.build.outputs.version }}
           path: outputs
@@ -147,7 +147,7 @@ jobs:
           ls -lh outputs/
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pigwiz-release-${{ needs.build.outputs.version }}
           # Everything destined for the release page, minus the stub
@@ -169,13 +169,13 @@ jobs:
       contents: write
     steps:
       - name: Download release artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: pigwiz-release-${{ needs.build.outputs.version }}
           path: outputs
 
       - name: Attach to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           # Strip the rolling -latest copies so only versioned filenames
           # land on the release page.
